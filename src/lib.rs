@@ -115,7 +115,6 @@ pub fn spawn_entity(x: f64, y: f64, w: f64, h: f64, xv: f64, yv: f64, text: &str
         .with(Position{x, y})
         .with(Velocity{xv, yv})
         .with(DomElement{id})
-        //.with(MouseAttract)
         .with(Collider{w, h})
         .build();
 
