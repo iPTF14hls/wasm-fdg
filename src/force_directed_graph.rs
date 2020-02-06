@@ -36,6 +36,10 @@ pub struct DomElement {
 #[storage(NullStorage)]
 pub struct MouseAttract;
 
+#[derive(Component, Debug)]
+#[storage(VecStorage)]
+pub struct Collider { pub rad: f64 }
+
 pub fn initialize_world() -> World {
     let mut world = World::new();
     world.insert(DeltaTime(0.));
@@ -96,8 +100,9 @@ impl<'a> System<'a> for ApplyPosition {
         for (ent, pos, dom) in (&*ents, &poses, &doms).join() {
             match doc.get_element_by_id(&dom.id) {
                 Some(elem) => {
-                    let offset = crate::utils::middle(elem.get_bounding_client_rect());
-                    if elem.set_attribute("style", &format!("position: absolute;top:{}px;left:{}px", offset.0 + pos.x, offset.1+pos.y)).is_err() {
+                    let rect = elem.get_bounding_client_rect();
+                    let (dx, dy) = (pos.x - rect.width() / 2., pos.y - rect.height());
+                    if elem.set_attribute("style", &format!("position: absolute;top:{}px;left:{}px", dy, dx)).is_err() {
                         eat_delete(ent);
                     };
                 }
@@ -114,17 +119,32 @@ impl<'a> System<'a> for FollowMouse {
 
     fn run(&mut self, (poses, mut vels, attracts, mpos): Self::SystemData) {
         let (mx, my) = mpos.0;
-        const MAX_ACC: f64 = 1.;
+        const MAX_ACC: f64 = 10.;
         for (pos, mut vel, _) in (&poses, &mut vels, &attracts).join() {
             let (ox, oy) = (mx - pos.x, my - pos.y);
-
-            info!("x: {} y: {}", ox, oy);
-            let (ax, ay) = (smooth_step_preserved_sign(ox) * MAX_ACC, smooth_step_preserved_sign(oy) * MAX_ACC);
-            vel.xv += ax;
-            vel.yv += ay;
+            let mag = smooth_step((ox.powi(2) + oy.powi(2)).sqrt()/MAX_ACC)*MAX_ACC;
+            let ang = oy.atan2(ox);
+            vel.xv += ang.cos()*mag;
+            vel.yv += ang.sin()*mag;
         }
     }
 }
+
+/*
+impl<'a> System<'a> for FollowMouse {
+    type SystemData = (WriteStorage<'a, Position>, Read<'a, MousePos>);
+
+    fn run(&mut self, (mut poses, mpos): Self::SystemData) {
+        let (mx, my) = mpos.0;
+        const MAX_ACC: f64 = 1.;
+        for mut pos in (&mut poses).join() {
+
+            pos.x = mx;
+            pos.y = my;
+        }
+    }
+}
+*/
 
 struct Friction;
 
@@ -139,11 +159,10 @@ impl<'a> System<'a> for Friction {
         }
     }
 }
-fn smooth_step_preserved_sign(x: f64) -> f64 {
-    smooth_step(x) * x.signum()
-}
+
+
 fn smooth_step(x: f64) -> f64 {
-    let cx = x.abs().clamp(0., 1.);
+    let cx = x.clamp(0., 1.);
     3.*cx.powi(2) -2.*cx.powi(3)
 }
 

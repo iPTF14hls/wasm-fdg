@@ -50,7 +50,6 @@ pub fn tick() {
         let mut delta = world.write_resource::<DeltaTime>();
         *delta = DeltaTime(delta_ms());
     }
-    info!("tick");
     crate::force_directed_graph::execute_systems(&world);
     world.maintain();
 }
