@@ -24,7 +24,6 @@ times.unshift(performance.now());
 
 
 async function fps(c_time) {
-    let fps = document.getElementById("fps");
     times.unshift(c_time);
     if (times.length > 45) {
         times.pop();
@@ -35,7 +34,13 @@ async function fps(c_time) {
         acc += times[i-1]-times[i];
         count++;
     }
-    fps.innerText = "FPS: " + Math.round(count/(acc*0.001));
+    return count/(acc*0.001);
+}
+
+async function set_fps(c_time) {
+    let f = fps(c_time);
+    let display = document.getElementById("fps");
+    display.innerText = "FPS: " + Math.round(await f);
 }
 
 async function loop() {
@@ -43,7 +48,7 @@ async function loop() {
     while (true) {
         await new Promise(resolve => setTimeout(resolve, 10));
         tick();
-        fps(performance.now());
+        set_fps(performance.now());
     }
 }
 
