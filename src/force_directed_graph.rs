@@ -41,7 +41,8 @@ pub struct MouseAttract;
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
 pub struct Collider {
-    pub rad: f64,
+    pub w: f64,
+    pub h: f64
 }
 
 pub fn initialize_world() -> World {
@@ -53,6 +54,7 @@ pub fn initialize_world() -> World {
     world.register::<Velocity>();
     world.register::<DomElement>();
     world.register::<MouseAttract>();
+    world.register::<Collider>();
     world
 }
 
@@ -106,7 +108,7 @@ impl<'a> System<'a> for ApplyPosition {
             match doc.get_element_by_id(&dom.id) {
                 Some(elem) => {
                     let rect = elem.get_bounding_client_rect();
-                    let (dx, dy) = (pos.x - rect.width() / 2., pos.y - rect.height());
+                    let (dx, dy) = (pos.x - rect.width() / 2., pos.y - rect.height()/2.);
                     if elem
                         .set_attribute(
                             "style",
@@ -153,25 +155,29 @@ impl<'a> System<'a> for Wall {
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Collider>,
-        Entities<'a>,
         Read<'a, ArenaSize>,
+        Entities<'a>,
     );
 
-    fn run(&mut self, (mut poses, mut vels, cldrs, ents, size): Self::SystemData) {
+    fn run(&mut self, (mut poses, mut vels, cldrs, size, ents): Self::SystemData) {
         let (w, h) = size.0;
-        for (ent, mut pos, cld) in (&ents, &mut poses, &cldrs).join() {
+        const FRICTION: f64 = 1.;
+        for (ent, mut pos, cld) in (&*ents, &mut poses, &cldrs).join() {
             let (px, py) = (pos.x, pos.y);
             let vop = vels.get_mut(ent);
-            pos.x = pos.x.clamp(0., w - cld.rad);
-            pos.y = pos.y.clamp(0., h - cld.rad);
+            if w - cld.w < 0. || h - cld.h < 0. {
+                return;
+            }
+            pos.x = pos.x.clamp(cld.w, w - cld.w);
+            pos.y = pos.y.clamp(cld.h, h - cld.h);
             if let Some(mut vel) = vop {
                 let (dx, dy) = (px - pos.x, py - pos.y);
                 if dx != 0.0 {
-                    vel.xv *= -0.8;
+                    vel.xv *= -FRICTION;
                 }
 
                 if dy != 0. {
-                    vel.yv *= -0.8;
+                    vel.yv *= -FRICTION;
                 }
             }
         }
@@ -184,7 +190,7 @@ impl<'a> System<'a> for Friction {
     type SystemData = WriteStorage<'a, Velocity>;
 
     fn run(&mut self, mut vels: Self::SystemData) {
-        const FRICTION: f64 = 0.95;
+        const FRICTION: f64 = 1.;
         for mut vel in (&mut vels).join() {
             vel.xv *= FRICTION;
             vel.yv *= FRICTION;

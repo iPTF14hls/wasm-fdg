@@ -81,6 +81,15 @@ pub fn update_mouse_position(x: f64, y: f64) {
 }
 
 #[wasm_bindgen]
+pub fn update_arena_size(w: f64, h: f64) {
+    use force_directed_graph::ArenaSize;
+    use specs::WorldExt;
+    let world = WORLD.lock().unwrap();
+    let mut size = world.write_resource::<ArenaSize>();
+    *size = ArenaSize((w, h));
+}
+
+#[wasm_bindgen]
 pub fn spawn_entity(text: &str, classes: Array) -> Result<(), JsValue> {
     let class: Vec<String> = classes.iter().filter_map(|elem| elem.as_string()).collect();
     let id: u64 = ID.fetch_add(1, Ordering::Relaxed);
@@ -98,16 +107,17 @@ pub fn spawn_entity(text: &str, classes: Array) -> Result<(), JsValue> {
     arena.append_child(&elem)?;
 
     //Now lets set up the real entity
-    use crate::force_directed_graph::{Position, Velocity, DomElement, MouseAttract}; 
+    use crate::force_directed_graph::{Position, Velocity, DomElement, MouseAttract, Collider}; 
     use specs::prelude::*;
 
     let mut world = WORLD.lock().unwrap();
     let (x, y) = middle(arena.get_bounding_client_rect());
     world.create_entity()
         .with(Position{x, y})
-        .with(Velocity::default())
+        .with(Velocity{xv: 100., yv: 100.})
         .with(DomElement{id})
-        .with(MouseAttract)
+        //.with(MouseAttract)
+        .with(Collider{w:200., h:110.})
         .build();
 
     Ok(())
