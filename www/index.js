@@ -24,9 +24,11 @@ times.unshift(performance.now());
 
 
 async function fps(c_time) {
-    times.unshift(c_time);
-    if (times.length > 45) {
-        times.pop();
+    if (c_time) {
+        times.unshift(c_time);
+        if (times.length > 45) {
+            times.pop();
+        }
     }
     let acc = 0;
     let count = 0;
@@ -43,17 +45,36 @@ async function set_fps(c_time) {
     display.innerText = "FPS: " + Math.round(await f);
 }
 
-async function loop() {
-    let timer = document.getElementById("timer");
-    while (true) {
-        await new Promise(resolve => setTimeout(resolve, 10));
+async function game_loop(times) {
+    for (let i = 0; i < times; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1));
         tick();
         set_fps(performance.now());
     }
 }
 
+let entities = 0;
+
+async function loop() {
+    let display = document.getElementById("bench");
+    let pfps = Number.POSITIVE_INFINITY;
+    console.log("yeet");
+    while (pfps > 25) {
+        await game_loop(50);
+        pfps = await fps(undefined);
+        console.log("Print fps" + pfps);
+        spawn_entity(500, 500, 50, 30, 100, 100,`<img width="100" src=https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/DVD_logo.svg/1200px-DVD_logo.svg.png>`, []);
+        entities++;
+        display.innerText = "Entities: "+entities;
+    }
+    
+    display.innerText = "Done. Total Entities: "+entities;
+    console.log("Broke");
+    await game_loop(Number.POSITIVE_INFINITY);
+
+}
+
 loop();
-spawn_entity(500, 500, 200, 110, 100, 100,`<img width="400" src=https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/DVD_logo.svg/1200px-DVD_logo.svg.png>`, [])
 const show_details = document.getElementById("status");
 
 show_details.addEventListener("click", event => {
