@@ -1,14 +1,16 @@
-use specs::{
-    world::EntitiesRes, Builder, Component, Dispatcher, DispatcherBuilder, Entities, Join,
-    NullStorage, Read, ReadStorage, System, VecStorage, World, WorldExt, WriteStorage,
-};
-use lazy_static::lazy_static;
 use log::info;
+use specs::{
+    world::EntitiesRes, Component, Entities, Join, NullStorage, Read, ReadStorage, System,
+    VecStorage, World, WorldExt, WriteStorage,
+};
 #[derive(Default)]
 pub struct DeltaTime(pub f64);
 
 #[derive(Default)]
 pub struct MousePos(pub (f64, f64));
+
+#[derive(Default)]
+pub struct ArenaSize(pub (f64, f64));
 
 //All units in Pixels
 #[derive(Component, Debug)]
@@ -38,12 +40,15 @@ pub struct MouseAttract;
 
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
-pub struct Collider { pub rad: f64 }
+pub struct Collider {
+    pub rad: f64,
+}
 
 pub fn initialize_world() -> World {
     let mut world = World::new();
-    world.insert(DeltaTime(0.));
-    world.insert(MousePos((0., 0.)));
+    world.insert(DeltaTime::default());
+    world.insert(MousePos::default());
+    world.insert(ArenaSize::default());
     world.register::<Position>();
     world.register::<Velocity>();
     world.register::<DomElement>();
@@ -90,7 +95,7 @@ impl<'a> System<'a> for ApplyPosition {
             if entres.delete(ent).is_err() {
                 //Honestly we couldn't give less of a shit about this.
                 //So this branch leads into a comment which will be optumized out.
-                //The reason why we don't care is because the deletion can only 
+                //The reason why we don't care is because the deletion can only
                 //fail if it's been deleted already.
                 //So either way the thing is deleted and we're now just twittling our thumbs until
                 //the world can collect the garbage.
@@ -102,7 +107,13 @@ impl<'a> System<'a> for ApplyPosition {
                 Some(elem) => {
                     let rect = elem.get_bounding_client_rect();
                     let (dx, dy) = (pos.x - rect.width() / 2., pos.y - rect.height());
-                    if elem.set_attribute("style", &format!("position: absolute;top:{}px;left:{}px", dy, dx)).is_err() {
+                    if elem
+                        .set_attribute(
+                            "style",
+                            &format!("position: absolute;top:{}px;left:{}px", dy, dx),
+                        )
+                        .is_err()
+                    {
                         eat_delete(ent);
                     };
                 }
@@ -115,36 +126,57 @@ impl<'a> System<'a> for ApplyPosition {
 struct FollowMouse;
 
 impl<'a> System<'a> for FollowMouse {
-    type SystemData = (ReadStorage<'a, Position>, WriteStorage<'a, Velocity>, ReadStorage<'a,MouseAttract>, Read<'a, MousePos>);
+    type SystemData = (
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
+        ReadStorage<'a, MouseAttract>,
+        Read<'a, MousePos>,
+    );
 
     fn run(&mut self, (poses, mut vels, attracts, mpos): Self::SystemData) {
         let (mx, my) = mpos.0;
         const MAX_ACC: f64 = 10.;
         for (pos, mut vel, _) in (&poses, &mut vels, &attracts).join() {
             let (ox, oy) = (mx - pos.x, my - pos.y);
-            let mag = smooth_step((ox.powi(2) + oy.powi(2)).sqrt()/MAX_ACC)*MAX_ACC;
+            let mag = smooth_step((ox.powi(2) + oy.powi(2)).sqrt() / MAX_ACC) * MAX_ACC;
             let ang = oy.atan2(ox);
-            vel.xv += ang.cos()*mag;
-            vel.yv += ang.sin()*mag;
+            vel.xv += ang.cos() * mag;
+            vel.yv += ang.sin() * mag;
         }
     }
 }
 
-/*
-impl<'a> System<'a> for FollowMouse {
-    type SystemData = (WriteStorage<'a, Position>, Read<'a, MousePos>);
+struct Wall;
 
-    fn run(&mut self, (mut poses, mpos): Self::SystemData) {
-        let (mx, my) = mpos.0;
-        const MAX_ACC: f64 = 1.;
-        for mut pos in (&mut poses).join() {
+impl<'a> System<'a> for Wall {
+    type SystemData = (
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
+        ReadStorage<'a, Collider>,
+        Entities<'a>,
+        Read<'a, ArenaSize>,
+    );
 
-            pos.x = mx;
-            pos.y = my;
+    fn run(&mut self, (mut poses, mut vels, cldrs, ents, size): Self::SystemData) {
+        let (w, h) = size.0;
+        for (ent, mut pos, cld) in (&ents, &mut poses, &cldrs).join() {
+            let (px, py) = (pos.x, pos.y);
+            let vop = vels.get_mut(ent);
+            pos.x = pos.x.clamp(0., w - cld.rad);
+            pos.y = pos.y.clamp(0., h - cld.rad);
+            if let Some(mut vel) = vop {
+                let (dx, dy) = (px - pos.x, py - pos.y);
+                if dx != 0.0 {
+                    vel.xv *= -0.8;
+                }
+
+                if dy != 0. {
+                    vel.yv *= -0.8;
+                }
+            }
         }
     }
 }
-*/
 
 struct Friction;
 
@@ -160,13 +192,12 @@ impl<'a> System<'a> for Friction {
     }
 }
 
-
 fn smooth_step(x: f64) -> f64 {
     let cx = x.clamp(0., 1.);
-    3.*cx.powi(2) -2.*cx.powi(3)
+    3. * cx.powi(2) - 2. * cx.powi(3)
 }
 
-pub fn execute_systems(world:&World) {
+pub fn execute_systems(world: &World) {
     use specs::RunNow;
 
     {
@@ -176,22 +207,17 @@ pub fn execute_systems(world:&World) {
     {
         let mut system = Friction;
         system.run_now(world);
-    } 
+    }
     {
         let mut system = VelocityApply;
         system.run_now(world);
-    }    
+    }
+    {
+        let mut system = Wall;
+        system.run_now(world);
+    }
     {
         let mut system = ApplyPosition;
         system.run_now(world);
     }
-    
-}
-
-pub fn initialize_dispatcher() -> Dispatcher<'static, 'static> {
-    DispatcherBuilder::new()
-    .with(FollowMouse, "follow_mouse", &[])
-    .with(VelocityApply, "velocity_apply", &["follow_mouse"])
-    .with(ApplyPosition, "apply_position", &["velocity_apply"])
-    .build()
 }

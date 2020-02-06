@@ -2,25 +2,21 @@ import { init, update_mouse_position, spawn_entity, print_arena_statistics, tick
 
 const ARENA = document.getElementById("arena");
 
-init();
+/*
+function update_size() {
 
-
-function find_true_position(x, y, element) {
-    let parent = element.parent;
-    if (parent) {
-        let box = getBoundingClientRect();
-        let dx = x + box.left;
-        let dy = y + box.top;
-        if (parent.id === "arena") {
-            return [dx, dy];
-        } else {
-            return find_true_position(dx, dy, parent);
-        }
-    }
-    else {
-        return undefined;
-    }
+let rect = ARENA.getBoundingClientRect();
+//update_arena_size(rect.width, rect.height);
 }
+
+update_size();
+object.addEventListener("resize", event => {
+    update_size();
+});
+
+*/
+
+init();
 
 ARENA.addEventListener("mousemove", event => {
     update_mouse_position(event.clientX, event.clientY);

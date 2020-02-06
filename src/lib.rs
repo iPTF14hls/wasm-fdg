@@ -1,5 +1,4 @@
 #![feature(clamp)]
-#![feature(impl_trait_in_bindings)]
 
 mod force_directed_graph;
 mod utils;
@@ -8,11 +7,13 @@ use crate::utils::{arena, document, get_arena_bounds, window, middle};
 use cfg_if::cfg_if;
 use js_sys::Array;
 use lazy_static::lazy_static;
-use specs::World;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Mutex,
 };
+
+
+use specs::{World, WorldExt};
 use wasm_bindgen::prelude::*;
 use log::info;
 
@@ -44,7 +45,6 @@ fn delta_ms() -> f64 {
 #[wasm_bindgen]
 pub fn tick() {
     use force_directed_graph::DeltaTime;
-    use specs::{Read, ReadStorage, System, World, WorldExt, WriteStorage};
     let mut world = WORLD.lock().unwrap();
     {
         let mut delta = world.write_resource::<DeltaTime>();
