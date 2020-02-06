@@ -26,7 +26,7 @@ times.unshift(performance.now());
 async function fps(c_time) {
     let fps = document.getElementById("fps");
     times.unshift(c_time);
-    if (times.length > 128) {
+    if (times.length > 45) {
         times.pop();
     }
     let acc = 0;
