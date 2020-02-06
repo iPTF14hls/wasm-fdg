@@ -28,7 +28,9 @@ async function loop() {
 }
 
 loop();
-spawn_entity(`<img width="400" src=https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/DVD_logo.svg/1200px-DVD_logo.svg.png>`, ["greeeeeen"])
+spawn_entity(600, 400, 200, 110, 100, 200,`<img width="400" src=https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/DVD_logo.svg/1200px-DVD_logo.svg.png>`, ["greeeeeen"])
+spawn_entity(900, 200, 200, 110, 250, 100,`<img width="400" src=https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/DVD_logo.svg/1200px-DVD_logo.svg.png>`, ["greeeeeen"])
+spawn_entity(100, 100, 200, 110, 160, 120,`<img width="400" src=https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/DVD_logo.svg/1200px-DVD_logo.svg.png>`, ["greeeeeen"])
 const show_details = document.getElementById("status");
 
 show_details.addEventListener("click", event => {

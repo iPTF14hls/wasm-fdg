@@ -90,7 +90,7 @@ pub fn update_arena_size(w: f64, h: f64) {
 }
 
 #[wasm_bindgen]
-pub fn spawn_entity(text: &str, classes: Array) -> Result<(), JsValue> {
+pub fn spawn_entity(x: f64, y: f64, w: f64, h: f64, xv: f64, yv: f64, text: &str, classes: Array) -> Result<(), JsValue> {
     let class: Vec<String> = classes.iter().filter_map(|elem| elem.as_string()).collect();
     let id: u64 = ID.fetch_add(1, Ordering::Relaxed);
     
@@ -111,13 +111,12 @@ pub fn spawn_entity(text: &str, classes: Array) -> Result<(), JsValue> {
     use specs::prelude::*;
 
     let mut world = WORLD.lock().unwrap();
-    let (x, y) = middle(arena.get_bounding_client_rect());
     world.create_entity()
         .with(Position{x, y})
-        .with(Velocity{xv: 100., yv: 100.})
+        .with(Velocity{xv, yv})
         .with(DomElement{id})
         //.with(MouseAttract)
-        .with(Collider{w:200., h:110.})
+        .with(Collider{w, h})
         .build();
 
     Ok(())
