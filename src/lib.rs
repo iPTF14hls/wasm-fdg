@@ -107,7 +107,7 @@ pub fn spawn_entity(x: f64, y: f64, w: f64, h: f64, xv: f64, yv: f64, text: &str
     arena.append_child(&elem)?;
 
     //Now lets set up the real entity
-    use crate::force_directed_graph::{Position, Velocity, DomElement, MouseAttract, Collider}; 
+    use crate::force_directed_graph::{Position, Velocity, DomElement, Repel, Collider}; 
     use specs::prelude::*;
 
     let mut world = WORLD.lock().unwrap();
@@ -116,6 +116,7 @@ pub fn spawn_entity(x: f64, y: f64, w: f64, h: f64, xv: f64, yv: f64, text: &str
         .with(Velocity{xv, yv})
         .with(DomElement{id})
         .with(Collider{w, h})
+        .with(Repel{charge: 50.})
         .build();
 
     Ok(())
