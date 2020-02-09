@@ -1,8 +1,9 @@
-use log::info;
+use serde::Deserialize;
 use specs::{
     world::EntitiesRes, Component, Entities, Join, NullStorage, Read, ReadStorage, System,
     VecStorage, World, WorldExt, WriteStorage,
 };
+use wasm_bindgen::prelude::*;
 #[derive(Default)]
 pub struct DeltaTime(pub f64);
 
@@ -32,7 +33,8 @@ impl PosDiff {
 }
 
 //All units in Pixels
-#[derive(Component, Debug)]
+#[wasm_bindgen]
+#[derive(Component, Debug, Deserialize, Default, Clone, Copy)]
 #[storage(VecStorage)]
 pub struct Position {
     pub x: f64,
@@ -49,11 +51,19 @@ impl Position {
 }
 
 //All units are in Pixels per seconds (pps)
-#[derive(Component, Debug, Default)]
+#[wasm_bindgen]
+#[derive(Component, Debug, Default, Deserialize, Clone, Copy)]
 #[storage(VecStorage)]
 pub struct Velocity {
-    pub xv: f64,
-    pub yv: f64,
+    pub vx: f64,
+    pub vy: f64,
+}
+
+impl Velocity {
+    fn apply_force_vector(&mut self, mag: f64, ang: f64) {
+        self.vx += mag * ang.cos();
+        self.vy += mag * ang.sin();
+    }
 }
 
 #[derive(Component, Debug)]
@@ -66,7 +76,8 @@ pub struct DomElement {
 #[storage(NullStorage)]
 pub struct MouseAttract;
 
-#[derive(Component, Debug)]
+#[wasm_bindgen]
+#[derive(Component, Debug, Deserialize, Clone, Copy)]
 #[storage(VecStorage)]
 pub struct Collider {
     pub w: f64,
@@ -84,6 +95,7 @@ pub fn initialize_world() -> World {
     world.register::<MouseAttract>();
     world.register::<Collider>();
     world.register::<Repel>();
+    world.register::<Edge>();
     world
 }
 
@@ -101,8 +113,8 @@ impl<'a> System<'a> for VelocityApply {
             //The 0.001 converts pixels per second to pixels per milisecond
             //Then d_time turns pixels per milisecond to pixels
             //After we add that to the position then we are done
-            pos.x += (vel.xv * 0.001) * d_time.0;
-            pos.y += (vel.yv * 0.001) * d_time.0;
+            pos.x += (vel.vx * 0.001) * d_time.0;
+            pos.y += (vel.vy * 0.001) * d_time.0;
         }
     }
 }
@@ -154,33 +166,11 @@ impl<'a> System<'a> for ApplyPosition {
     }
 }
 
-struct FollowMouse;
 
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
 pub struct Repel {
     pub charge: f64,
-}
-
-impl<'a> System<'a> for FollowMouse {
-    type SystemData = (
-        ReadStorage<'a, Position>,
-        WriteStorage<'a, Velocity>,
-        ReadStorage<'a, MouseAttract>,
-        Read<'a, MousePos>,
-    );
-
-    fn run(&mut self, (poses, mut vels, attracts, mpos): Self::SystemData) {
-        let (mx, my) = mpos.0;
-        const MAX_ACC: f64 = 10.;
-        for (pos, mut vel, _) in (&poses, &mut vels, &attracts).join() {
-            let (ox, oy) = (mx - pos.x, my - pos.y);
-            let mag = smooth_step((ox.powi(2) + oy.powi(2)).sqrt() / MAX_ACC) * MAX_ACC;
-            let ang = oy.atan2(ox);
-            vel.xv += ang.cos() * mag;
-            vel.yv += ang.sin() * mag;
-        }
-    }
 }
 
 struct Wall;
@@ -208,11 +198,11 @@ impl<'a> System<'a> for Wall {
             if let Some(mut vel) = vop {
                 let (dx, dy) = (px - pos.x, py - pos.y);
                 if dx != 0.0 {
-                    vel.xv *= -FRICTION;
+                    vel.vx *= -FRICTION;
                 }
 
                 if dy != 0. {
-                    vel.yv *= -FRICTION;
+                    vel.vy *= -FRICTION;
                 }
             }
         }
@@ -227,8 +217,8 @@ impl<'a> System<'a> for Friction {
     fn run(&mut self, mut vels: Self::SystemData) {
         const FRICTION: f64 = 0.995;
         for mut vel in (&mut vels).join() {
-            vel.xv *= FRICTION;
-            vel.yv *= FRICTION;
+            vel.vx *= FRICTION;
+            vel.vy *= FRICTION;
         }
     }
 }
@@ -253,32 +243,108 @@ impl<'a> System<'a> for CoulombRepulsion {
                 }
                 let acc = CONST * (c1.charge * c2.charge) / dist;
                 let ang = diff.angle();
-                vel.xv += ang.cos() * acc;
-                vel.yv += ang.sin() * acc;
+                vel.vx += ang.cos() * acc;
+                vel.vy += ang.sin() * acc;
             }
         }
     }
 }
 
-fn smooth_step(x: f64) -> f64 {
-    let cx = x.clamp(0., 1.);
-    3. * cx.powi(2) - 2. * cx.powi(3)
+#[derive(Component)]
+#[storage(VecStorage)]
+struct Edge {
+    nodes: (specs::Entity, specs::Entity),
+    ideal: f64,
+    k: f64,
+}
+
+struct HooksLaw;
+
+impl<'a> System<'a> for HooksLaw {
+    type SystemData = (
+        ReadStorage<'a, Edge>,
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
+        Entities<'a>,
+        Read<'a, EntitiesRes>,
+    );
+
+    fn run(&mut self, (edges, poses, mut vels, ents, ent_res): Self::SystemData) {
+        for (ent, edge) in (&ents, &edges).join() {
+            let Edge {
+                nodes: (n1, n2),
+                ideal,
+                k,
+            } = edge;
+            let p1 = {
+                match poses.get(*n1) {
+                    Some(p) => p,
+                    _ => {
+                        let _ = ent_res.delete(ent);
+                        continue;
+                    }
+                }
+            };
+
+            let p2 = {
+                match poses.get(*n2) {
+                    Some(p) => p,
+                    _ => {
+                        let _ = ent_res.delete(ent);
+                        continue;
+                    }
+                }
+            };
+
+            let pdiff = p1.diff(p2);
+            let diff = (ideal - pdiff.dist()).abs();
+            let ang = pdiff.angle();
+            let hooks_force = diff * k;
+            match vels.get_mut(*n1) {
+                Some(v) => {
+                    v.apply_force_vector(ang, hooks_force);
+                }
+                None => {
+                    let _ = ent_res.delete(ent);
+                    continue;
+                }
+            }
+
+            let undo = match vels.get_mut(*n2) {
+                Some(v) => {
+                    v.apply_force_vector(ang, -hooks_force);
+                    false
+                }
+                None => {
+                    let _ = ent_res.delete(ent);
+                    true
+                }
+            };
+
+            //It is possible that one could fail and not the other
+            //So we need a way to undo the last thing we did.
+            if undo {
+                if let Some(v) = vels.get_mut(*n1) {
+                    v.apply_force_vector(ang, -hooks_force);
+                }
+            }
+        }
+    }
 }
 
 pub fn execute_systems(world: &World) {
     use specs::RunNow;
-
+    
     {
-        let mut system = FollowMouse;
+        let mut system = HooksLaw;
+        system.run_now(world);
+    }
+    {
+        let mut system = CoulombRepulsion;
         system.run_now(world);
     }
     {
         let mut system = Friction;
-        system.run_now(world);
-    }
-
-    {
-        let mut system = CoulombRepulsion;
         system.run_now(world);
     }
     {

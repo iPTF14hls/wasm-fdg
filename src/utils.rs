@@ -28,7 +28,3 @@ pub fn arena() -> Option<web_sys::Element> {
 pub fn get_arena_bounds() -> Option<web_sys::DomRect> {
     Some(arena()?.get_bounding_client_rect())
 }
-
-pub fn middle(rect: web_sys::DomRect) -> (f64, f64) {
-    (rect.width()/2., rect.height()/2.)
-}

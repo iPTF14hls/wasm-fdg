@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook", "console_log"]
 
 [dependencies]
-wasm-bindgen = "0.2"
+wasm-bindgen = {version = "0.2", features = [ "serde-serialize" ] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
@@ -33,6 +33,7 @@ lazy_static = "1.4.0"
 specs = { version = "0.15.1", features = ["specs-derive", "wasm-bindgen"] }
 cfg-if = "0.1.10"
 js-sys = "0.3.35"
+serde = { version = "1.0.104", features = ["derive"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
@@ -43,4 +44,4 @@ opt-level = "s"
 
 [dependencies.web-sys]
 version = "*"
-features = ["Window","Document","Performance", "Element", "DomRect", "Node"]
+features = ["Window","Document","Performance", "Element", "DomRect", "Node", "TextDecoder", "TextEncoder"]
