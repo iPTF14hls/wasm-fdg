@@ -3,7 +3,7 @@
 mod force_directed_graph;
 mod utils;
 
-use crate::utils::{arena, document, get_arena_bounds, window, middle};
+use crate::utils::{arena, document, get_arena_bounds, window};
 use cfg_if::cfg_if;
 use js_sys::Array;
 use lazy_static::lazy_static;
@@ -11,11 +11,10 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Mutex,
 };
-
+use serde::Deserialize;
 
 use specs::{World, WorldExt};
 use wasm_bindgen::prelude::*;
-use log::info;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -89,15 +88,38 @@ pub fn update_arena_size(w: f64, h: f64) {
     *size = ArenaSize((w, h));
 }
 
+//input
+//x: f64, 
+//y: f64, 
+//w: f64, 
+//h: f64, 
+//xv: f64, y
+//v: f64, 
+//text: &str
+use crate::force_directed_graph::{Position, Velocity, Collider};
+
+
+#[derive(Deserialize)]
+pub struct EntityArgs {
+    pub pos: Option<Position>,
+    pub vel: Option<Velocity>,
+    pub colds: Option<Collider>,
+    pub html: String,
+}
+
 #[wasm_bindgen]
-pub fn spawn_entity(x: f64, y: f64, w: f64, h: f64, xv: f64, yv: f64, text: &str, classes: Array) -> Result<(), JsValue> {
+pub fn spawn_entity(args: &JsValue, classes: Array) -> Result<String, JsValue> {
     let class: Vec<String> = classes.iter().filter_map(|elem| elem.as_string()).collect();
     let id: u64 = ID.fetch_add(1, Ordering::Relaxed);
-    
+    let args: EntityArgs = match args.into_serde() {
+        Ok(args) => args,
+        Err(e) => return Err(JsValue::from(format!("Could not parse args. {}", e))),
+    };
+
     //Dom shenanigans
     let arena = arena().unwrap();
     let elem = document().create_element("div")?;
-    elem.set_inner_html(text);
+    elem.set_inner_html(args.html.as_str());
     let class_name = class
         .into_iter()
         .fold(String::new(), |acc, s| format!("{} {}", acc, s));
@@ -107,19 +129,24 @@ pub fn spawn_entity(x: f64, y: f64, w: f64, h: f64, xv: f64, yv: f64, text: &str
     arena.append_child(&elem)?;
 
     //Now lets set up the real entity
-    use crate::force_directed_graph::{Position, Velocity, DomElement, Repel, Collider}; 
+    use crate::force_directed_graph::{DomElement, Repel}; 
     use specs::prelude::*;
 
     let mut world = WORLD.lock().unwrap();
-    world.create_entity()
-        .with(Position{x, y})
-        .with(Velocity{xv, yv})
-        .with(DomElement{id})
-        .with(Collider{w, h})
-        .with(Repel{charge: 50.})
-        .build();
+    let ent = world.create_entity()
+        .with(args.pos.unwrap_or_default())
+        .with(args.vel.unwrap_or_default())
+        .with(DomElement{id: id.clone()})
+        .with(Repel{charge: 50.});
 
-    Ok(())
+    let ent = match args.colds {
+        Some(cold) => ent.with(cold),
+        None => ent,
+    };
+
+    ent.build();
+
+    Ok(id)
 }
 
 #[wasm_bindgen]

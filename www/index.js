@@ -63,7 +63,22 @@ async function loop() {
         await game_loop(50);
         pfps = await fps(undefined);
         console.log("Print fps" + pfps);
-        spawn_entity(500, 500, 50, 30, 100, 100,`<img width="100" src=https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/DVD_logo.svg/1200px-DVD_logo.svg.png>`, []);
+        let args = {
+            "pos": {
+                "x": 500,
+                "y": 500
+            },
+            "vel": {
+                "vx": 100,
+                "vy": 100
+            },
+            "colds": {
+                "w": 50,
+                "h": 20
+            },
+            "html":`<img width="100" src=https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/DVD_logo.svg/1200px-DVD_logo.svg.png>`
+        };
+        spawn_entity(args, []);
         entities++;
         display.innerText = "Entities: "+entities;
     }
